@@ -161,12 +161,7 @@ th,td{text-align:left;padding:10px;border-bottom:1px solid var(--bd)}
 </form>
 </div></section>
 
-<section class="sec" id="adm"><div class="w">
-<h2>Waitlist admin</h2>
-<div class="grid" style="grid-template-columns:1fr auto;gap:12px;margin-bottom:16px"><input id="q" placeholder="Search name or email"><button class="btn" id="csv" type="button">Export CSV</button></div>
-<p class="lead" id="tot" style="margin-bottom:12px"></p>
-<div class="tw"><table><thead><tr><th>Name</th><th>Email</th><th>WhatsApp</th><th>Business</th><th>Joined</th></tr></thead><tbody id="tb"></tbody></table></div>
-</div></section>
+
 
 <section class="sec" id="faq"><div class="w" style="max-width:760px">
 <h2>Questions</h2>
@@ -187,8 +182,10 @@ th,td{text-align:left;padding:10px;border-bottom:1px solid var(--bd)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = https://omxeamgclmbexngnqgeo.supabase.co/rest/v1/
-const SUPABASE_KEY = sb_publishable_eTRunKEJWuvMSynR5j6YTA_GFoXMZa1;// Add real MP4 URLs here when available. Empty src shows an honest placeholder.
+const SUPABASE_URL = "https://omxeamgclmbexngnqgeo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_eTRunKEJWuvMSynR5j6YTA_GFoXMZa1";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Add real MP4 URLs here when available. Empty src shows an honest placeholder.
 var VIDEOS=[
 {t:"Skincare Product Ad",d:"Luxury product commercials created with AI.",src:"",poster:""},
 {t:"Café Promotional Reel",d:"Make your café stand out on social media.",src:"",poster:""},
@@ -224,39 +221,28 @@ f.addEventListener("submit",async function(ev){
  if(bad)return;
  sb.disabled=true;sb.textContent="Saving…";
  try{
-  var db=await claude.use("db");
-  if(!db)throw new Error("Waitlist storage is not connected for this page yet. Your details were not saved.");
-  var us=await claude.use("user");var ref=db.doc("waitlist/"+(await us.id()));
-  await ref.set({full_name:name,email:email,whatsapp_number:ph,business_name:biz,website:site,created_at:new Date().toISOString()});
+  const { error } = await supabase.from("waitlist").insert({
+   name:name,
+   email:email,
+   whatsapp:ph,
+   business_name:biz||null,
+   website:site||null
+  });
+  if(error){
+   if(error.code==="23505")throw new Error("This email is already on the waitlist.");
+   throw error;
+  }
   f.reset();ok.style.display="block";
- }catch(x){fe.textContent=x.message||"Could not save. Try again.";fe.style.display="block"}
- sb.disabled=false;sb.textContent="Get Early Access";
+ }catch(x){
+  fe.textContent=x.message||"Could not save. Please try again.";
+  fe.style.display="block";
+ }finally{
+  sb.disabled=false;sb.textContent="Get Early Access";
+ }
 });
 
 $("uf").addEventListener("submit",function(e){e.preventDefault();$("w").value=$("u").value.trim();$("waitlist").scrollIntoView();$("n").focus({preventScroll:true})});
-// Admin view: shown only to users with edit rights
-var rows=[];
-function draw(){
- var q=$("q").value.toLowerCase(),r=rows.filter(function(x){return (x.full_name+x.email).toLowerCase().indexOf(q)>-1});
- $("tot").textContent="Total registrations: "+rows.length;
- var tb=$("tb");tb.textContent="";
- r.forEach(function(x){var tr=document.createElement("tr");[x.full_name,x.email,x.whatsapp_number,x.business_name||"",(x.created_at||"").slice(0,10)].forEach(function(v){var td=document.createElement("td");td.textContent=v;tr.appendChild(td)});tb.appendChild(tr)});
-}
-(async function(){
- try{
-  var u=await claude.use("user");if(!u||!u.canEdit())return;
-  var db=await claude.use("db");if(!db)return;
-  $("adm").style.display="block";
-  db.collection("waitlist").onSnapshot(function(s){rows=[];s.forEach(function(d){rows.push(d.data())});rows.sort(function(a,b){return (b.created_at||"")<(a.created_at||"")?-1:1});draw()});
-  $("q").oninput=draw;
-  $("csv").onclick=async function(){
-   var dl=await claude.use("downloads");if(!dl)return;
-   var esc=function(v){return '"'+String(v||"").replace(/"/g,'""')+'"'};
-   var t="name,email,whatsapp,business,joined\n"+rows.map(function(x){return [x.full_name,x.email,x.whatsapp_number,x.business_name,x.created_at].map(esc).join(",")}).join("\n");
-   try{await dl.save({filename:"vyro-waitlist.csv",data:t})}catch(e){}
-  };
- }catch(e){}
-})();
+
 </script>
 </body>
 </html>
