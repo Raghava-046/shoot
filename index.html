@@ -180,11 +180,35 @@ th,td{text-align:left;padding:10px;border-bottom:1px solid var(--bd)}
 <div class="cp">© 2026 VYRO. All rights reserved.</div>
 </div></footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://omxeamgclmbexngnqgeo.supabase.co";
 const SUPABASE_KEY = "sb_publishable_eTRunKEJWuvMSynR5j6YTA_GFoXMZa1";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabaseClient = null;
+let supabasePromise = null;
+function loadSupabase(){
+ if(supabaseClient)return Promise.resolve(supabaseClient);
+ if(supabasePromise)return supabasePromise;
+ supabasePromise=new Promise(function(resolve,reject){
+  if(window.supabase&&window.supabase.createClient){
+   supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);resolve(supabaseClient);return;
+  }
+  var sources=["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2","https://unpkg.com/@supabase/supabase-js@2"];
+  function trySource(i){
+   if(i>=sources.length){supabasePromise=null;reject(new Error("Could not load the secure signup service. Please check your internet connection and try again."));return;}
+   var s=document.createElement("script");s.src=sources[i];s.async=true;
+   s.onload=function(){
+    if(window.supabase&&window.supabase.createClient){
+     try{supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);resolve(supabaseClient);}
+     catch(e){supabasePromise=null;reject(new Error("The signup service could not start. Please refresh and try again."));}
+    }else{ s.remove();trySource(i+1); }
+   };
+   s.onerror=function(){s.remove();trySource(i+1);};
+   document.head.appendChild(s);
+  }
+  trySource(0);
+ });
+ return supabasePromise;
+}
 // Add real MP4 URLs here when available. Empty src shows an honest placeholder.
 var VIDEOS=[
 {t:"Skincare Product Ad",d:"Luxury product commercials created with AI.",src:"",poster:""},
@@ -221,7 +245,8 @@ f.addEventListener("submit",async function(ev){
  if(bad)return;
  sb.disabled=true;sb.textContent="Saving…";
  try{
-  const { error } = await supabase.from("waitlist").insert({
+  const client = await loadSupabase();
+  const { error } = await client.from("waitlist").insert({
    name:name,
    email:email,
    whatsapp:ph,
